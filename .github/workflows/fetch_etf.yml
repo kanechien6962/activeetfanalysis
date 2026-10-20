@@ -31,8 +31,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # 加引號讓 git 自己展開萬用字元，這樣被刪除的舊報表也會一併 stage
-          git add -A -- 'ETF_Data/report_*.json'
+          mkdir -p ETF_Data
+          # 加入整個資料夾但排除 xlsx：即使當天沒有產生報表也不會報錯，
+          # 而且被刪除的舊報表也會一併 stage
+          git add -A -- ETF_Data ':(exclude)ETF_Data/*.xlsx'
           if git diff --cached --quiet; then
             echo "沒有變更，略過 commit"
           else
