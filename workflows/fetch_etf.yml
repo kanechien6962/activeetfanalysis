@@ -1,0 +1,41 @@
+name: Fetch ETF Portfolio
+
+on:
+  schedule:
+    # UTC 10:00 = 台灣時間 18:00，週一到週五
+    - cron: "0 10 * * 1-5"
+  workflow_dispatch: # 可手動觸發測試
+
+permissions:
+  contents: write # 需要權限把結果 commit 回 repo
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download Excel and convert to JSON
+        run: python etf_pipeline.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # 加引號讓 git 自己展開萬用字元，這樣被刪除的舊報表也會一併 stage
+          git add -A -- 'ETF_Data/report_*.json'
+          if git diff --cached --quiet; then
+            echo "沒有變更，略過 commit"
+          else
+            git commit -m "chore: update ETF data $(TZ=Asia/Taipei date +%F)"
+            git push
+          fi
