@@ -66,7 +66,7 @@
         </div>
 
         <!-- 狀態與提示訊息 -->
-        <div id="infoLabel" class="text-sm text-[#6B7280] px-1 font-medium">請輸入 GitHub 資訊並點擊讀取按鈕</div>
+        <div id="infoLabel" class="text-sm text-[#6B7280] px-1 font-medium">請點擊讀取按鈕以載入 GitHub 資料</div>
 
         <!-- 表格容器 -->
         <div class="bg-white rounded-xl shadow-sm border border-[#E3E5EA] overflow-hidden">
@@ -95,9 +95,8 @@
     </div>
 
     <script>
-        let globalFilesData = {}; // 結構: { prefix: { dateStr: parsedObject } }
-        let allFileDates = {};   // 結構: { prefix: [sorted dates] }
-        let rawFilePaths = {};   // 結構: { prefix: { dateStr: download_url } }
+        let globalFilesData = {}; // 結構: { etfPrefix: { dateStr: { code: {股數, 持股權重, 股票名稱} } } }
+        let allFileDates = {};   // 結構: { etfPrefix: [sorted dates] }
 
         document.getElementById('etfCombo').addEventListener('change', renderTable);
         document.getElementById('searchInput').addEventListener('input', applyFilter);
@@ -130,70 +129,72 @@
 
                 if (!Array.isArray(files)) throw new Error("回傳格式不正確，請確認路徑是否為資料夾");
 
-                // 篩選出類似 report_YYYYMMDD.json 的檔案
-                const filePattern = /^(.*)_ETF_Investment_Portfolio_(\d{8})\.json$\vert{}^report_(\d{8})\.json$/;
-                
-                let matchedFiles = [];
+                let dateFileMap = {}; // 收集所有日期的下載網址 { dateStr: download_url }
 
                 for (let file of files) {
                     const fname = file.name;
-                    // 兼容原本的檔名或純日期格式 report_YYYYMMDD.json
-                    let m = fname.match(/^(.*)_(\d{8})\.json$\vert{}^report_(\d{8})\.json$/);
+                    // 匹配 report_YYYYMMDD.json 或是 任何prefix_YYYYMMDD.json
+                    let m = fname.match(/report_(\d{8})\.json$/i) \vert{}\vert{} fname.match(/_(\d{8})\.json$/i);
                     if (m) {
-                        let prefix = m[1] ? m[1] : "ETF";
-                        let dateStr = m[2] ? m[2] : m[3];
-                        matchedFiles.push({ prefix, dateStr, download_url: file.download_url });
+                        let dateStr = m[1];
+                        dateFileMap[dateStr] = file.download_url;
                     }
                 }
 
-                if (matchedFiles.length === 0) {
-                    infoLabel.textContent = "⚠ 找不到符合格式的 JSON 檔案（需為 *_YYYYMMDD.json 或 report_YYYYMMDD.json）";
+                let sortedDates = Object.keys(dateFileMap).sort((a, b) => a.localeCompare(b));
+
+                if (sortedDates.length === 0) {
+                    infoLabel.textContent = "⚠ 找不到符合格式的 JSON 檔案（需包含 YYYYMMDD 日期，例如 report_20261019.json）";
                     infoLabel.className = "text-sm text-[#E5484D] px-1 font-medium";
                     return;
                 }
 
-                // 依照 Prefix 分組
-                let grouped = {};
-                for (let f of matchedFiles) {
-                    if (!grouped[f.prefix]) grouped[f.prefix] = [];
-                    grouped[f.prefix].push(f);
+                const limitCount = parseInt(document.getElementById('compareLimitSelect').value) || 5;
+                // 取最後 N 個日期的檔案
+                let selectedDates = sortedDates.slice(-limitCount);
+
+                infoLabel.textContent = "正在下載並解析 JSON 內容...";
+
+                let rawDataByDate = {}; // { dateStr: jsonData }
+
+                for (let dateStr of selectedDates) {
+                    let url = dateFileMap[dateStr];
+                    try {
+                        let jsonRes = await fetch(url);
+                        let jsonData = await jsonRes.json();
+                        rawDataByDate[dateStr] = jsonData;
+                    } catch (err) {
+                        console.error(`下載或解析失敗 ${dateStr}:`, err);
+                    }
+                }
+
+                // 重新整理結構：找出所有出現過的 ETF 系列 (例如 403A, 981A, 991A)
+                let etfPrefixes = new Set();
+                for (let dateStr in rawDataByDate) {
+                    let dataObj = rawDataByDate[dateStr];
+                    Object.keys(dataObj).forEach(prefix => etfPrefixes.add(prefix));
                 }
 
                 globalFilesData = {};
                 allFileDates = {};
-                rawFilePaths = {};
 
-                const limitCount = parseInt(document.getElementById('compareLimitSelect').value) || 5;
-
-                infoLabel.textContent = "正在下載並解析 JSON 內容...";
-
-                for (let prefix in grouped) {
-                    // 依日期排序
-                    grouped[prefix].sort((a, b) => a.dateStr.localeCompare(b.dateStr));
-                    
-                    // 取最後 N 個檔案
-                    let selected = grouped[prefix].slice(-limitCount);
-                    
-                    allFileDates[prefix] = selected.map(x => x.dateStr);
-                    rawFilePaths[prefix] = {};
+                etfPrefixes.forEach(prefix => {
                     globalFilesData[prefix] = {};
+                    allFileDates[prefix] = [];
 
-                    for (let item of selected) {
-                        rawFilePaths[prefix][item.dateStr] = item.download_url;
-                        try {
-                            const jsonRes = await fetch(item.download_url);
-                            const jsonData = await jsonRes.json();
-                            
-                            // 解析結構支援多種層級
-                            let parsed = parseJsonPortfolio(jsonData, prefix);
-                            if (parsed) {
-                                globalFilesData[prefix][item.dateStr] = parsed;
+                    for (let dateStr of selectedDates) {
+                        let dataObj = rawDataByDate[dateStr];
+                        if (dataObj && dataObj[prefix]) {
+                            let parsed = parsePortfolioItems(dataObj[prefix]);
+                            if (parsed && Object.keys(parsed).length > 0) {
+                                globalFilesData[prefix][dateStr] = parsed;
+                                if (!allFileDates[prefix].includes(dateStr)) {
+                                    allFileDates[prefix].push(dateStr);
+                                }
                             }
-                        } catch (err) {
-                            console.error(`解析檔案失敗 ${item.download_url}:`, err);
                         }
                     }
-                }
+                });
 
                 populateEtfComboAndRender();
 
@@ -204,27 +205,15 @@
             }
         }
 
-        function parseJsonPortfolio(jsonData, prefix) {
-            // 嘗試尋找對應的 ETF 區塊或直接使用根物件
-            let targetObj = null;
-            if (jsonData[prefix]) {
-                targetObj = jsonData[prefix];
-            } else {
-                // 尋找第一個含有陣列的 key
-                let keys = Object.keys(jsonData);
-                if (keys.length > 0) targetObj = jsonData[keys[0]];
-            }
-
-            if (!targetObj) return null;
-
-            // 尋找陣列資料（例如 "基金投資組合" 或 "Sheet1" 或直接就是陣列）
+        function parsePortfolioItems(etfContentObj) {
+            // 尋找內部真正的陣列 (例如 "基金投資組合" 或 "Sheet1")
             let itemsList = [];
-            if (Array.isArray(targetObj)) {
-                itemsList = targetObj;
-            } else if (typeof targetObj === 'object') {
-                for (let k in targetObj) {
-                    if (Array.isArray(targetObj[k])) {
-                        itemsList = targetObj[k];
+            if (Array.isArray(etfContentObj)) {
+                itemsList = etfContentObj;
+            } else if (typeof etfContentObj === 'object' && etfContentObj !== null) {
+                for (let k in etfContentObj) {
+                    if (Array.isArray(etfContentObj[k])) {
+                        itemsList = etfContentObj[k];
                         break;
                     }
                 }
@@ -246,7 +235,6 @@
 
                 result[code] = { "股數": shares, "持股權重": weight, "股票名稱": name };
             }
-
             return result;
         }
 
@@ -254,18 +242,20 @@
             const etfCombo = document.getElementById('etfCombo');
             etfCombo.innerHTML = "";
 
-            let prefixes = Object.keys(globalFilesData);
+            let prefixes = Object.keys(globalFilesData).filter(p => Object.keys(globalFilesData[p]).length > 0);
             if (prefixes.length === 0) {
                 etfCombo.innerHTML = `<option value="">無可用資料</option>`;
+                document.getElementById('infoLabel').textContent = "⚠ 找不到有效的 ETF 投資組合資料";
+                document.getElementById('infoLabel').className = "text-sm text-[#E5484D] px-1 font-medium";
                 return;
             }
 
-            for (let p of prefixes) {
+            prefixes.sort().forEach(p => {
                 let opt = document.createElement('option');
                 opt.value = p;
                 opt.textContent = `ETF 系列: ${p}`;
                 etfCombo.appendChild(opt);
-            }
+            });
 
             renderTable();
         }
@@ -275,19 +265,14 @@
             const infoLabel = document.getElementById('infoLabel');
             if (!prefix || !globalFilesData[prefix]) return;
 
-            const limitCount = parseInt(document.getElementById('compareLimitSelect').value) || 5;
             let dates = allFileDates[prefix] || [];
-            
-            // 根據選取的個數截取最近的 N 個
-            if (dates.length > limitCount) {
-                dates = dates.slice(-limitCount);
-            }
+            dates.sort((a, b) => a.localeCompare(b));
 
             let formattedDates = dates.map(d => `${d.substring(4, 6)}/${d.substring(6, 8)}`);
             let dfs = globalFilesData[prefix];
 
             if (dates.length < 2) {
-                infoLabel.textContent = `[${prefix}] ⚠ 檔案數量不足 2 個，無法進行期數比較`;
+                infoLabel.textContent = `[${prefix}] ⚠ 可用日期檔案少於 2 個，無法進行期數比較`;
                 infoLabel.className = "text-sm text-[#E5484D] px-1 font-medium";
                 document.getElementById('tableBody').innerHTML = "";
                 return;
@@ -298,14 +283,15 @@
 
             // 收集所有股票代號
             let allCodes = new Set();
-            for (let d of dates) {
+            dates.forEach(d => {
                 if (dfs[d]) {
                     Object.keys(dfs[d]).forEach(c => allCodes.add(c));
                 }
-            }
+            });
 
             // 以最新一期的權重排序
-            let latestData = dfs[dates[dates.length - 1]] || {};
+            let latestDate = dates[dates.length - 1];
+            let latestData = dfs[latestDate] || {};
             let sortedCodes = Array.from(allCodes).sort((a, b) => {
                 let wA = latestData[a] ? latestData[a]["持股權重"] : -1;
                 let wB = latestData[b] ? latestData[b]["持股權重"] : -1;
