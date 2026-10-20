@@ -45,7 +45,7 @@
                     <label class="block text-xs font-semibold text-[#6B7280] mb-1">資料夾路徑 (Folder Path)</label>
                     <div class="flex space-x-2">
                         <input type="text" id="ghPathInput" value="etf-data" class="w-full border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm">
-                        <button onclick="loadDataFromGitHub()" class="bg-[#2F6FED] hover:bg-[#255ACB] text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition shrink-0">讀取</button>
+                        <button type="button" onclick="loadDataFromGitHub()" class="bg-[#2F6FED] hover:bg-[#255ACB] text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition shrink-0">讀取</button>
                     </div>
                 </div>
             </div>
@@ -95,8 +95,8 @@
     </div>
 
     <script>
-        let globalFilesData = {}; // 結構: { etfPrefix: { dateStr: { code: {股數, 持股權重, 股票名稱} } } }
-        let allFileDates = {};   // 結構: { etfPrefix: [sorted dates] }
+        let globalFilesData = {};
+        let allFileDates = {};
 
         document.getElementById('etfCombo').addEventListener('change', renderTable);
         document.getElementById('searchInput').addEventListener('input', applyFilter);
@@ -129,11 +129,10 @@
 
                 if (!Array.isArray(files)) throw new Error("回傳格式不正確，請確認路徑是否為資料夾");
 
-                let dateFileMap = {}; // 收集所有日期的下載網址 { dateStr: download_url }
+                let dateFileMap = {};
 
                 for (let file of files) {
                     const fname = file.name;
-                    // 匹配 report_YYYYMMDD.json 或是 任何prefix_YYYYMMDD.json
                     let m = fname.match(/report_(\d{8})\.json$/i) \vert{}\vert{} fname.match(/_(\d{8})\.json$/i);
                     if (m) {
                         let dateStr = m[1];
@@ -150,12 +149,11 @@
                 }
 
                 const limitCount = parseInt(document.getElementById('compareLimitSelect').value) || 5;
-                // 取最後 N 個日期的檔案
                 let selectedDates = sortedDates.slice(-limitCount);
 
                 infoLabel.textContent = "正在下載並解析 JSON 內容...";
 
-                let rawDataByDate = {}; // { dateStr: jsonData }
+                let rawDataByDate = {};
 
                 for (let dateStr of selectedDates) {
                     let url = dateFileMap[dateStr];
@@ -168,7 +166,6 @@
                     }
                 }
 
-                // 重新整理結構：找出所有出現過的 ETF 系列 (例如 403A, 981A, 991A)
                 let etfPrefixes = new Set();
                 for (let dateStr in rawDataByDate) {
                     let dataObj = rawDataByDate[dateStr];
@@ -206,7 +203,6 @@
         }
 
         function parsePortfolioItems(etfContentObj) {
-            // 尋找內部真正的陣列 (例如 "基金投資組合" 或 "Sheet1")
             let itemsList = [];
             if (Array.isArray(etfContentObj)) {
                 itemsList = etfContentObj;
@@ -281,7 +277,6 @@
             infoLabel.textContent = `[${prefix}] ✅ 已載入 ${dates.length} 個檔案 ｜ 分析區間：${formattedDates[0]} ～ ${formattedDates[-1]}`;
             infoLabel.className = "text-sm text-[#1A8754] font-semibold px-1";
 
-            // 收集所有股票代號
             let allCodes = new Set();
             dates.forEach(d => {
                 if (dfs[d]) {
@@ -289,7 +284,6 @@
                 }
             });
 
-            // 以最新一期的權重排序
             let latestDate = dates[dates.length - 1];
             let latestData = dfs[latestDate] || {};
             let sortedCodes = Array.from(allCodes).sort((a, b) => {
@@ -298,7 +292,6 @@
                 return wB - wA;
             });
 
-            // 建立表頭
             let colHeaders = ["股票代號", "股票名稱"];
             let comparisonPeriods = [];
             for (let i = 0; i < dates.length - 1; i++) {
@@ -314,7 +307,6 @@
             theadHtml += "</tr>";
             document.getElementById('tableHeader').innerHTML = theadHtml;
 
-            // 建立表格內容
             let tbodyHtml = "";
             sortedCodes.forEach(code => {
                 let stockName = "";
@@ -329,7 +321,6 @@
                 tbodyHtml += `<td class="table-cell-custom text-center font-bold">${code}</td>`;
                 tbodyHtml += `<td class="table-cell-custom text-left">${stockName}</td>`;
 
-                // 各期股數變化
                 comparisonPeriods.forEach(p => {
                     let dPrev = dfs[p.prev];
                     let dCurr = dfs[p.curr];
@@ -363,7 +354,6 @@
                     tbodyHtml += `<td class="table-cell-custom text-center ${colorClass} ${isBold ? 'font-bold' : ''}">${valStr}</td>`;
                 });
 
-                // 最後一期權重增減
                 let lastDiffStr = "-";
                 let lastDiffColor = "text-[#C9CDD4]";
                 if (dates.length >= 2) {
