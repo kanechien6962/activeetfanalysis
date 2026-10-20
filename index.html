@@ -1,682 +1,426 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ETF Portfolio Analysis (GitHub Pages SPA)</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Inter Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            appBg: '#F5F6FA',
-            appCard: '#FFFFFF',
-            primary: '#2F6FED',
-            primaryHover: '#255ACB',
-            primaryPressed: '#1E48A6',
-            textColor: '#1F2430',
-            subText: '#6B7280',
-            borderColor: '#E3E5EA',
-            upColor: '#E5484D',    // 加碼 / 權重增加 (紅)
-            downColor: '#1A8754',  // 減碼 / 權重減少 (綠)
-            newColor: '#2F6FED',   // 新建倉 (藍)
-            soldColor: '#9CA3AF',  // 已賣光 (灰)
-            zeroColor: '#C9CDD4',  // 無變化 (淡灰)
-          },
-          fontFamily: {
-            sans: ['Inter', 'Microsoft JhengHei UI', 'sans-serif'],
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    body {
-      background-color: #F5F6FA;
-      color: #1F2430;
-      font-family: 'Inter', 'Microsoft JhengHei UI', sans-serif;
-    }
-    .table-container::-webkit-scrollbar {
-      height: 8px;
-      width: 8px;
-    }
-    .table-container::-webkit-scrollbar-track {
-      background: #F0F2F6;
-      border-radius: 4px;
-    }
-    .table-container::-webkit-scrollbar-thumb {
-      background: #C9CDD4;
-      border-radius: 4px;
-    }
-    .table-container::-webkit-scrollbar-thumb:hover {
-      background: #9CA3AF;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETF Portfolio Analysis (GitHub JSON Version)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .table-cell-custom { padding: 6px 10px; white-space: nowrap; }
+    </style>
 </head>
-<body class="min-h-screen p-3 sm:p-5 text-sm">
-  <div class="max-w-7xl mx-auto space-y-4">
-    
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-appCard p-4 rounded-xl border border-borderColor shadow-sm">
-      <div>
-        <h1 class="text-xl font-bold text-textColor flex items-center gap-2">
-          <span>📊</span> ETF Portfolio Analysis
-          <span class="text-xs font-normal text-white bg-primary px-2 py-0.5 rounded-full">GitHub Pages Version</span>
-        </h1>
-        <p class="text-xs text-subText mt-1">自動讀取 GitHub 儲存庫 JSON 歷史資料，比對基金持股與權重變化</p>
-      </div>
-      
-      <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
-        <button id="btnFetchGithub" class="flex-1 md:flex-initial px-3.5 py-1.5 bg-primary hover:bg-primaryHover text-white rounded-lg transition font-medium text-xs flex items-center justify-center gap-1.5 shadow-sm">
-          <span>🔄</span> 抓取 GitHub 最新資料
-        </button>
-        <button id="btnLoadDemo" class="flex-1 md:flex-initial px-3.5 py-1.5 bg-indigo-50 text-primary border border-primary/30 rounded-lg hover:bg-indigo-100 transition font-medium text-xs flex items-center justify-center gap-1.5">
-          <span>⚡</span> 載入 Demo 測試資料
-        </button>
-      </div>
-    </div>
-
-    <!-- Data Source Options Card -->
-    <div class="bg-appCard rounded-xl border border-borderColor p-4 shadow-sm space-y-3">
-      
-      <!-- GitHub Source Config Row -->
-      <div class="space-y-2">
-        <div class="flex items-center justify-between">
-          <label class="font-semibold text-textColor flex items-center gap-1.5 text-xs">
-            <span>🐙</span> GitHub 資料來源設定
-          </label>
-          <button id="toggleUploadBtn" class="text-xs text-primary hover:underline">
-            使用 本機上傳 JSON 檔 ➔
-          </button>
-        </div>
-
-        <div id="githubConfigPanel" class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-2.5 bg-gray-50 p-3 rounded-lg border border-borderColor">
-          <div class="flex flex-col gap-1">
-            <span class="text-[11px] text-subText font-medium">Repository (owner/repo)</span>
-            <input type="text" id="ghRepo" placeholder="username/repository" value="sample/etf-data" class="bg-white border border-borderColor rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-primary">
-          </div>
-          <div class="flex flex-col gap-1">
-            <span class="text-[11px] text-subText font-medium">Branch</span>
-            <input type="text" id="ghBranch" placeholder="main" value="main" class="bg-white border border-borderColor rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-primary">
-          </div>
-          <div class="flex flex-col gap-1 sm:col-span-1 md:col-span-2">
-            <span class="text-[11px] text-subText font-medium">Folder Path (資料夾路徑，留空代表根目錄)</span>
-            <input type="text" id="ghFolderPath" placeholder="e.g. data/etf or reports" value="" class="bg-white border border-borderColor rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-primary">
-          </div>
-        </div>
-
-        <!-- Local Upload Area (Hidden by default) -->
-        <div id="localUploadPanel" class="hidden bg-gray-50 p-3 rounded-lg border border-borderColor flex flex-wrap items-center gap-2">
-          <input type="file" id="fileInput" multiple accept=".json" class="hidden">
-          <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden">
-          <button onclick="document.getElementById('fileInput').click()" class="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-medium hover:bg-primaryHover">
-            📁 上傳多個 JSON 檔
-          </button>
-          <button onclick="document.getElementById('folderInput').click()" class="px-3 py-1.5 bg-white border border-primary text-primary rounded-md text-xs font-medium hover:bg-blue-50">
-            📂 上傳整包資料夾
-          </button>
-          <span id="localFileCount" class="text-xs text-subText ml-2">尚未選擇檔案</span>
-        </div>
-      </div>
-
-      <!-- Controls Row: ETF Select, Compare Limit, Filter Search -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2 border-t border-gray-100">
+<body class="bg-[#F5F6FA] text-[#1F2430] font-sans antialiased">
+    <div class="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
         
-        <!-- ETF Selector -->
-        <div class="flex items-center gap-2">
-          <label for="etfSelect" class="w-16 font-semibold text-textColor shrink-0">ETF 代號</label>
-          <select id="etfSelect" class="flex-1 bg-white border border-borderColor rounded-lg px-3 py-1.5 focus:outline-none focus:border-primary text-textColor font-medium">
-            <option value="">載入中...</option>
-          </select>
+        <!-- 頂部標題卡片 -->
+        <div class="bg-white rounded-xl shadow-sm border border-[#E3E5EA] p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-[#1F2430]">ETF 投資組合變動分析</h1>
+                    <p class="text-sm text-[#6B7280] mt-1">透過 GitHub JSON 資料自動比對各期持股與權重變化</p>
+                </div>
+                <!-- 比對個數選擇 -->
+                <div class="flex items-center space-x-2">
+                    <label class="text-sm font-semibold text-[#1F2430]">比對期數:</label>
+                    <select id="compareLimitSelect" class="border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[#2F6FED]">
+                        <option value="5" selected>最近 5 期</option>
+                        <option value="10">最近 10 期</option>
+                        <option value="20">最近 20 期</option>
+                        <option value="60">最近 60 期</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- GitHub 設定列 -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[#E3E5EA]">
+                <div>
+                    <label class="block text-xs font-semibold text-[#6B7280] mb-1">GitHub Repo (owner/repo)</label>
+                    <input type="text" id="ghRepoInput" value="kanechien6962/activeetfanalysis" class="w-full border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-[#6B7280] mb-1">分支 (Branch)</label>
+                    <input type="text" id="ghBranchInput" value="main" class="w-full border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-[#6B7280] mb-1">資料夾路徑 (Folder Path)</label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="ghPathInput" value="etf-data" class="w-full border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm">
+                        <button onclick="loadDataFromGitHub()" class="bg-[#2F6FED] hover:bg-[#255ACB] text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition shrink-0">讀取</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ETF 選擇與即時搜尋 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div class="flex items-center space-x-3">
+                    <label class="text-sm font-semibold w-16 shrink-0">ETF 系列</label>
+                    <select id="etfCombo" class="w-full border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[#2F6FED]">
+                        <option value="">請先載入資料...</option>
+                    </select>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <label class="text-sm font-semibold w-16 shrink-0">篩選標的</label>
+                    <input type="text" id="searchInput" placeholder="輸入代號或名稱 (例: 2330 或 台積電)..." class="w-full border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#2F6FED]">
+                </div>
+            </div>
         </div>
 
-        <!-- Comparison Period Selector -->
-        <div class="flex items-center gap-2">
-          <label for="compareLimitSelect" class="w-16 font-semibold text-textColor shrink-0">比對個數</label>
-          <select id="compareLimitSelect" class="flex-1 bg-white border border-borderColor rounded-lg px-3 py-1.5 focus:outline-none focus:border-primary text-textColor font-medium">
-            <option value="5" selected>近 5 期 (預設)</option>
-            <option value="10">近 10 期</option>
-            <option value="20">近 20 期</option>
-            <option value="60">近 60 期</option>
-          </select>
+        <!-- 狀態與提示訊息 -->
+        <div id="infoLabel" class="text-sm text-[#6B7280] px-1 font-medium">請輸入 GitHub 資訊並點擊讀取按鈕</div>
+
+        <!-- 表格容器 -->
+        <div class="bg-white rounded-xl shadow-sm border border-[#E3E5EA] overflow-hidden">
+            <div class="overflow-x-auto max-h-[600px]">
+                <table id="dataTable" class="w-full text-left border-collapse text-sm">
+                    <thead id="tableHeader" class="bg-[#F0F2F6] text-[#1F2430] sticky top-0 z-10 border-b border-[#E3E5EA]">
+                        <tr>
+                            <th class="table-cell-custom font-semibold">股票代號</th>
+                            <th class="table-cell-custom font-semibold">股票名稱</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-[#E3E5EA]">
+                        <!-- 動態生成列 -->
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <!-- Filter Search Box -->
-        <div class="flex items-center gap-2 sm:col-span-2 md:col-span-1">
-          <label for="filterInput" class="w-12 font-semibold text-textColor shrink-0">篩選</label>
-          <input type="text" id="filterInput" placeholder="搜尋股票代號或名稱 (如 2330 或 台積電)..." class="flex-1 bg-white border border-borderColor rounded-lg px-3 py-1.5 focus:outline-none focus:border-primary text-textColor placeholder-subText text-xs">
+        <!-- 圖例說明 -->
+        <div class="flex flex-wrap items-center gap-6 text-xs font-semibold px-1">
+            <span class="text-[#E5484D]">● 加碼 / 權重增加</span>
+            <span class="text-[#1A8754]">● 減碼 / 權重減少</span>
+            <span class="text-[#2F6FED]">● 新建倉</span>
+            <span class="text-[#9CA3AF]">● 已賣光</span>
         </div>
-
-      </div>
-
     </div>
 
-    <!-- Info Status Banner -->
-    <div id="infoBanner" class="px-4 py-2.5 rounded-lg bg-blue-50 border border-blue-100 text-primary text-xs font-semibold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1">
-      <span id="bannerText">ℹ️ 準備就緒</span>
-      <span id="recordCount" class="text-subText font-normal"></span>
-    </div>
+    <script>
+        let globalFilesData = {}; // 結構: { prefix: { dateStr: parsedObject } }
+        let allFileDates = {};   // 結構: { prefix: [sorted dates] }
+        let rawFilePaths = {};   // 結構: { prefix: { dateStr: download_url } }
 
-    <!-- Main Data Table Card -->
-    <div class="bg-appCard rounded-xl border border-borderColor shadow-sm overflow-hidden flex flex-col">
-      <div class="table-container overflow-x-auto max-h-[620px]">
-        <table id="portfolioTable" class="w-full text-left border-collapse whitespace-nowrap">
-          <thead class="bg-[#F0F2F6] sticky top-0 z-10 border-b-2 border-borderColor text-xs font-bold text-textColor">
-            <tr id="tableHeaderRow">
-              <th class="p-3 cursor-pointer hover:bg-gray-200" onclick="sortTable(0)">股票代號 ⇕</th>
-              <th class="p-3 cursor-pointer hover:bg-gray-200" onclick="sortTable(1)">股票名稱 ⇕</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody" class="divide-y divide-borderColor text-xs">
-            <tr>
-              <td colspan="10" class="p-8 text-center text-subText">資料載入中...</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Color Legend -->
-    <div class="flex flex-wrap items-center gap-4 text-xs font-semibold px-2 py-1">
-      <div class="flex items-center gap-1.5 text-upColor">
-        <span class="inline-block w-2.5 h-2.5 rounded-full bg-upColor"></span> 加碼 / 權重增加
-      </div>
-      <div class="flex items-center gap-1.5 text-downColor">
-        <span class="inline-block w-2.5 h-2.5 rounded-full bg-downColor"></span> 減碼 / 權重減少
-      </div>
-      <div class="flex items-center gap-1.5 text-newColor">
-        <span class="inline-block w-2.5 h-2.5 rounded-full bg-newColor"></span> 新建倉
-      </div>
-      <div class="flex items-center gap-1.5 text-soldColor">
-        <span class="inline-block w-2.5 h-2.5 rounded-full bg-soldColor"></span> 已賣光
-      </div>
-      <div class="flex items-center gap-1.5 text-gray-400">
-        <span class="inline-block w-2.5 h-2.5 rounded-full bg-gray-300"></span> 無變化 / 0
-      </div>
-    </div>
-
-  </div>
-
-  <!-- Main JavaScript Logic -->
-  <script>
-    // System State
-    let parsedFilesData = []; // Array of { prefix, dateStr, fileName, portfolio }
-    let availablePrefixes = [];
-    let currentFilteredRows = [];
-    let sortDirections = {};
-    let isLocalMode = false;
-
-    // Built-in Demo Data for immediate preview
-    const DEMO_FILES = {
-      "report_20261015.json": {
-        "403A": { "基金投資組合": [ { "代號": 2330, "名稱": "台積電", "股數": "7,500,000", "權重": "13.80%" }, { "代號": 3037, "名稱": "欣興", "股數": "6,800,000", "權重": "5.50%" }, { "代號": 3653, "名稱": "健策", "股數": "1,000,000", "權重": "5.00%" } ] },
-        "981A": { "基金投資組合": [ { "代號": 2330, "名稱": "台積電", "股數": "12,000,000", "權重": "10.20%" }, { "代號": 2383, "名稱": "台光電", "股數": "4,000,000", "權重": "7.50%" } ] }
-      },
-      "report_20261016.json": {
-        "403A": { "基金投資組合": [ { "代號": 2330, "名稱": "台積電", "股數": "7,600,000", "權重": "14.00%" }, { "代號": 3037, "名稱": "欣興", "股數": "6,900,000", "權重": "5.80%" }, { "代號": 3653, "名稱": "健策", "股數": "1,100,000", "權重": "5.40%" }, { "代號": 2454, "名稱": "聯發科", "股數": "1,000,000", "權重": "3.50%" } ] },
-        "981A": { "基金投資組合": [ { "代號": 2330, "名稱": "台積電", "股數": "12,100,000", "權重": "10.50%" }, { "代號": 2383, "名稱": "台光電", "股數": "4,200,000", "權重": "7.80%" }, { "代號": 3037, "名稱": "欣興", "股數": "18,000,000", "權重": "7.20%" } ] }
-      },
-      "report_20261017.json": {
-        "403A": { "基金投資組合": [ { "代號": 2330, "名稱": "台積電", "股數": "7,600,000", "權重": "14.10%" }, { "代號": 3037, "名稱": "欣興", "股數": "7,000,000", "權重": "5.90%" }, { "代號": 3653, "名稱": "健策", "股數": "1,115,000", "權重": "5.50%" }, { "代號": 2454, "名稱": "聯發科", "股數": "1,200,000", "權重": "4.00%" } ] },
-        "981A": { "基金投資組合": [ { "代號": 2330, "名稱": "台積電", "股數": "12,200,000", "權重": "10.60%" }, { "代號": 2383, "名稱": "台光電", "股數": "4,300,000", "權重": "7.90%" }, { "代號": 3037, "名稱": "欣興", "股數": "19,000,000", "權重": "7.50%" } ] }
-      },
-      "report_20261018.json": {
-        "403A": { "基金投資組合": [ { "代號": 2330, "名稱": "台積電", "股數": "7,650,000", "權重": "14.15%" }, { "代號": 3037, "名稱": "欣興", "股數": "7,000,000", "權重": "5.95%" }, { "代號": 3653, "名稱": "健策", "股數": "1,115,000", "權重": "5.55%" }, { "代號": 2454, "名稱": "聯發科", "股數": "1,400,000", "權重": "4.50%" } ] },
-        "981A": { "基金投資組合": [ { "代號": 2330, "名稱": "台積電", "股數": "12,300,000", "權重": "10.75%" }, { "代號": 2383, "名稱": "台光電", "股數": "4,320,000", "權重": "8.00%" }, { "代號": 3037, "名稱": "欣興", "股數": "19,200,000", "權重": "7.80%" } ] }
-      },
-      "report_20261019.json": {
-        "981A": { "基金投資組合": [ { "代號": 2330, "名稱": "台積電", "股數": "12,392,000", "權重": "10.86%" }, { "代號": 2383, "名稱": "台光電", "股數": "4,328,000", "權重": "8.04%" }, { "代號": 3037, "名稱": "欣興", "股數": "19,499,000", "權重": "7.91%" }, { "代號": 2454, "名稱": "聯發科", "股數": "5,143,000", "權重": "7.84%" } ] },
-        "403A": { "基金投資組合": [ { "代號": 2330, "名稱": "台積電", "股數": "7,700,000", "權重": "14.21%" }, { "代號": 3037, "名稱": "欣興", "股數": "7,000,000", "權重": "5.98%" }, { "代號": 3653, "名稱": "健策", "股數": "1,115,000", "權重": "5.58%" }, { "代號": 3017, "名稱": "奇鋐", "股數": "2,140,000", "權重": "5.42%" }, { "代號": 2454, "名稱": "聯發科", "股數": "1,500,000", "權重": "4.81%" } ] },
-        "991A": { "Sheet1": [ { "代號": 2330, "名稱": "台灣積體", "股數": "4,200,000", "權重": "14.483%" }, { "代號": 2383, "名稱": "台光電子", "股數": "1,350,000", "權重": "9.859%" } ] }
-      }
-    };
-
-    // Event Bindings
-    document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById('btnFetchGithub').addEventListener('click', fetchGitHubData);
-      document.getElementById('btnLoadDemo').addEventListener('click', loadDemoData);
-      document.getElementById('toggleUploadBtn').addEventListener('click', toggleUploadMode);
-      document.getElementById('fileInput').addEventListener('change', handleLocalFiles);
-      document.getElementById('folderInput').addEventListener('change', handleLocalFiles);
-      document.getElementById('etfSelect').addEventListener('change', analyzeAndRenderTable);
-      document.getElementById('compareLimitSelect').addEventListener('change', analyzeAndRenderTable);
-      document.getElementById('filterInput').addEventListener('input', applyFilter);
-
-      // Default load Demo
-      loadDemoData();
-    });
-
-    // Helper: Clean String -> Number
-    function parseNum(val) {
-      if (val === null || val === undefined) return 0;
-      if (typeof val === 'number') return val;
-      let s = String(val).replace(/,/g, '').replace(/%/g, '').trim();
-      let n = parseFloat(s);
-      return isNaN(n) ? 0 : n;
-    }
-
-    // Helper: Format comma separated integer
-    function formatInt(val) {
-      return Math.round(val).toLocaleString('en-US');
-    }
-
-    // Helper: Extract Date string from filename
-    function extractDateStr(fileName) {
-      let match = fileName.match(/(\d{8})/);
-      return match ? match[1] : fileName;
-    }
-
-    // Toggle local file upload panel
-    function toggleUploadMode() {
-      isLocalMode = !isLocalMode;
-      const ghPanel = document.getElementById('githubConfigPanel');
-      const localPanel = document.getElementById('localUploadPanel');
-      const toggleBtn = document.getElementById('toggleUploadBtn');
-
-      if (isLocalMode) {
-        ghPanel.classList.add('hidden');
-        localPanel.classList.remove('hidden');
-        toggleBtn.textContent = "➔ 使用 GitHub 遠端資料抓取";
-      } else {
-        ghPanel.classList.remove('hidden');
-        localPanel.classList.add('hidden');
-        toggleBtn.textContent = "使用 本機上傳 JSON 檔 ➔";
-      }
-    }
-
-    // Process parsed JSON into normalized structure
-    function processJsonObject(fileName, dateStr, jsonObj) {
-      if (!jsonObj || typeof jsonObj !== 'object') return;
-
-      // Handle root wrapper (e.g. { "981A": { "基金投資組合": [...] } })
-      for (const [prefix, content] of Object.entries(jsonObj)) {
-        let itemsList = [];
-
-        if (Array.isArray(content)) {
-          itemsList = content;
-        } else if (typeof content === 'object' && content !== null) {
-          const key = Object.keys(content).find(k => Array.isArray(content[k]));
-          if (key) itemsList = content[key];
-        }
-
-        if (itemsList.length > 0) {
-          let normalizedDict = {};
-          itemsList.forEach(item => {
-            let code = String(item["代號"] || item["股票代號"] || item["證券代號"] || "").trim();
-            let name = String(item["名稱"] || item["股票名稱"] || item["證券名稱"] || "").trim();
-            let shares = parseNum(item["股數"]);
-            let weight = parseNum(item["權重"] || item["持股權重"] || item["權重(%)"]);
-
-            if (code) {
-              normalizedDict[code] = { code, name, shares, weight };
+        document.getElementById('etfCombo').addEventListener('change', renderTable);
+        document.getElementById('searchInput').addEventListener('input', applyFilter);
+        document.getElementById('compareLimitSelect').addEventListener('change', () => {
+            if (Object.keys(globalFilesData).length > 0) {
+                populateEtfComboAndRender();
             }
-          });
-
-          parsedFilesData.push({
-            prefix,
-            dateStr,
-            fileName,
-            portfolio: normalizedDict
-          });
-        }
-      }
-    }
-
-    // Action: Load Demo Data
-    function loadDemoData() {
-      parsedFilesData = [];
-      for (const [fileName, jsonObj] of Object.entries(DEMO_FILES)) {
-        let dateStr = extractDateStr(fileName);
-        processJsonObject(fileName, dateStr, jsonObj);
-      }
-      postLoadProcessing("⚡ 已載入預設 Demo 測試資料 (5 期歷史記錄)");
-    }
-
-    // Action: Fetch Data from GitHub API
-    async function fetchGitHubData() {
-      const repo = document.getElementById('ghRepo').value.trim();
-      const branch = document.getElementById('ghBranch').value.trim() || 'main';
-      let folderPath = document.getElementById('ghFolderPath').value.trim();
-
-      if (!repo || !repo.includes('/')) {
-        updateBanner("⚠️ 請輸入正確的 GitHub Repository (例如 owner/repo)", "text-upColor", "bg-red-50");
-        return;
-      }
-
-      updateBanner("⏳ 正從 GitHub 抓取檔案目錄列表中...", "text-primary", "bg-blue-50");
-
-      try {
-        if (folderPath && !folderPath.endsWith('/')) folderPath += '/';
-        const apiUrl = `https://api.github.com/repos/${repo}/contents/${folderPath}?ref=${branch}`;
-
-        const res = await fetch(apiUrl);
-        if (!res.ok) throw new Error(`GitHub API 回應錯誤 (${res.status})`);
-
-        const files = await res.json();
-        if (!Array.isArray(files)) throw new Error("指定的路徑不是有效的資料夾目錄");
-
-        // Filter JSON files
-        const jsonFiles = files.filter(f => f.type === 'file' && f.name.endsWith('.json'));
-
-        if (jsonFiles.length === 0) {
-          updateBanner("⚠️ GitHub 資料夾內找不到任何 .json 檔案", "text-upColor", "bg-red-50");
-          return;
-        }
-
-        // Sort files descending by date extracted from filename
-        jsonFiles.sort((a, b) => {
-          let dA = extractDateStr(a.name);
-          let dB = extractDateStr(b.name);
-          return dB.localeCompare(dA); // Newest first
         });
 
-        // Determine maximum needed files (e.g. up to 60)
-        const limitNeeded = parseInt(document.getElementById('compareLimitSelect').value, 10);
-        const filesToFetch = jsonFiles.slice(0, limitNeeded);
+        async function loadDataFromGitHub() {
+            const repo = document.getElementById('ghRepoInput').value.trim();
+            const branch = document.getElementById('ghBranchInput').value.trim() || 'main';
+            const path = document.getElementById('ghPathInput').value.trim();
+            const infoLabel = document.getElementById('infoLabel');
 
-        updateBanner(`⏳ 找到 ${jsonFiles.length} 個 JSON 檔案，正在下載最近 ${filesToFetch.length} 期資料...`, "text-primary", "bg-blue-50");
+            if (!repo) {
+                alert('請輸入 GitHub Repository (owner/repo)');
+                return;
+            }
 
-        parsedFilesData = [];
-        for (const fileObj of filesToFetch) {
-          const fileRes = await fetch(fileObj.download_url);
-          const jsonObj = await fileRes.json();
-          const dateStr = extractDateStr(fileObj.name);
-          processJsonObject(fileObj.name, dateStr, jsonObj);
+            infoLabel.textContent = "正在向 GitHub 要求檔案清單...";
+            infoLabel.className = "text-sm text-[#2F6FED] px-1 font-medium";
+
+            const apiUrl = `https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`;
+
+            try {
+                const res = await fetch(apiUrl);
+                if (!res.ok) throw new Error(`GitHub API 回應錯誤: ${res.statusText}`);
+                const files = await res.json();
+
+                if (!Array.isArray(files)) throw new Error("回傳格式不正確，請確認路徑是否為資料夾");
+
+                // 篩選出類似 report_YYYYMMDD.json 的檔案
+                const filePattern = /^(.*)_ETF_Investment_Portfolio_(\d{8})\.json$\vert{}^report_(\d{8})\.json$/;
+                
+                let matchedFiles = [];
+
+                for (let file of files) {
+                    const fname = file.name;
+                    // 兼容原本的檔名或純日期格式 report_YYYYMMDD.json
+                    let m = fname.match(/^(.*)_(\d{8})\.json$\vert{}^report_(\d{8})\.json$/);
+                    if (m) {
+                        let prefix = m[1] ? m[1] : "ETF";
+                        let dateStr = m[2] ? m[2] : m[3];
+                        matchedFiles.push({ prefix, dateStr, download_url: file.download_url });
+                    }
+                }
+
+                if (matchedFiles.length === 0) {
+                    infoLabel.textContent = "⚠ 找不到符合格式的 JSON 檔案（需為 *_YYYYMMDD.json 或 report_YYYYMMDD.json）";
+                    infoLabel.className = "text-sm text-[#E5484D] px-1 font-medium";
+                    return;
+                }
+
+                // 依照 Prefix 分組
+                let grouped = {};
+                for (let f of matchedFiles) {
+                    if (!grouped[f.prefix]) grouped[f.prefix] = [];
+                    grouped[f.prefix].push(f);
+                }
+
+                globalFilesData = {};
+                allFileDates = {};
+                rawFilePaths = {};
+
+                const limitCount = parseInt(document.getElementById('compareLimitSelect').value) || 5;
+
+                infoLabel.textContent = "正在下載並解析 JSON 內容...";
+
+                for (let prefix in grouped) {
+                    // 依日期排序
+                    grouped[prefix].sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+                    
+                    // 取最後 N 個檔案
+                    let selected = grouped[prefix].slice(-limitCount);
+                    
+                    allFileDates[prefix] = selected.map(x => x.dateStr);
+                    rawFilePaths[prefix] = {};
+                    globalFilesData[prefix] = {};
+
+                    for (let item of selected) {
+                        rawFilePaths[prefix][item.dateStr] = item.download_url;
+                        try {
+                            const jsonRes = await fetch(item.download_url);
+                            const jsonData = await jsonRes.json();
+                            
+                            // 解析結構支援多種層級
+                            let parsed = parseJsonPortfolio(jsonData, prefix);
+                            if (parsed) {
+                                globalFilesData[prefix][item.dateStr] = parsed;
+                            }
+                        } catch (err) {
+                            console.error(`解析檔案失敗 ${item.download_url}:`, err);
+                        }
+                    }
+                }
+
+                populateEtfComboAndRender();
+
+            } catch (err) {
+                console.error(err);
+                infoLabel.textContent = "⚠ 讀取失敗：" + err.message;
+                infoLabel.className = "text-sm text-[#E5484D] px-1 font-medium";
+            }
         }
 
-        postLoadProcessing(`✅ 已成功從 GitHub 抓取 ${filesToFetch.length} 期持股資料！`);
+        function parseJsonPortfolio(jsonData, prefix) {
+            // 嘗試尋找對應的 ETF 區塊或直接使用根物件
+            let targetObj = null;
+            if (jsonData[prefix]) {
+                targetObj = jsonData[prefix];
+            } else {
+                // 尋找第一個含有陣列的 key
+                let keys = Object.keys(jsonData);
+                if (keys.length > 0) targetObj = jsonData[keys[0]];
+            }
 
-      } catch (err) {
-        console.error(err);
-        updateBanner(`❌ 抓取失敗: ${err.message}`, "text-upColor", "bg-red-50");
-      }
-    }
+            if (!targetObj) return null;
 
-    // Action: Local File Upload
-    async function handleLocalFiles(e) {
-      const files = Array.from(e.target.files).filter(f => f.name.endsWith('.json'));
-      if (files.length === 0) return;
+            // 尋找陣列資料（例如 "基金投資組合" 或 "Sheet1" 或直接就是陣列）
+            let itemsList = [];
+            if (Array.isArray(targetObj)) {
+                itemsList = targetObj;
+            } else if (typeof targetObj === 'object') {
+                for (let k in targetObj) {
+                    if (Array.isArray(targetObj[k])) {
+                        itemsList = targetObj[k];
+                        break;
+                    }
+                }
+            }
 
-      document.getElementById('localFileCount').textContent = `已選擇 ${files.length} 個檔案`;
-      parsedFilesData = [];
+            if (!itemsList.length) return null;
 
-      for (const file of files) {
-        try {
-          const text = await file.text();
-          const jsonObj = JSON.parse(text);
-          const dateStr = extractDateStr(file.name);
-          processJsonObject(file.name, dateStr, jsonObj);
-        } catch (err) {
-          console.error("Local JSON error:", file.name, err);
-        }
-      }
+            let result = {};
+            for (let row of itemsList) {
+                let code = String(row["代號"] || row["股票代號"] || row["證券代號"] || "").trim();
+                if (!code) continue;
 
-      postLoadProcessing(`📁 已從本機讀取 ${files.length} 個 JSON 檔`);
-    }
+                let name = String(row["名稱"] || row["股票名稱"] || row["證券名稱"] || "").trim();
+                let sharesStr = String(row["股數"] || "0").replace(/,/g, "");
+                let shares = parseFloat(sharesStr) || 0;
 
-    // Update Dropdown list after files loaded
-    function postLoadProcessing(msg) {
-      const prefixesSet = new Set(parsedFilesData.map(d => d.prefix));
-      availablePrefixes = Array.from(prefixesSet).sort();
+                let weightStr = String(row["權重"] || row["持股權重"] || "0").replace(/%|,/g, "");
+                let weight = parseFloat(weightStr) || 0;
 
-      const etfSelect = document.getElementById('etfSelect');
-      etfSelect.innerHTML = '';
+                result[code] = { "股數": shares, "持股權重": weight, "股票名稱": name };
+            }
 
-      availablePrefixes.forEach(prefix => {
-        const opt = document.createElement('option');
-        opt.value = prefix;
-        opt.textContent = prefix;
-        etfSelect.appendChild(opt);
-      });
-
-      if (availablePrefixes.length > 0) {
-        analyzeAndRenderTable();
-      } else {
-        updateBanner("⚠️ 找不到合適的 ETF 持股資料", "text-upColor", "bg-red-50");
-        document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" class="p-6 text-center text-subText">無可比對資料</td></tr>';
-      }
-    }
-
-    // Banner message update helper
-    function updateBanner(text, textClass = "text-primary", bgClass = "bg-blue-50") {
-      const banner = document.getElementById('infoBanner');
-      banner.className = `px-4 py-2.5 rounded-lg border border-blue-100 text-xs font-semibold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 ${bgClass} ${textClass}`;
-      document.getElementById('bannerText').textContent = text;
-    }
-
-    // Core Analysis & Table Render
-    function analyzeAndRenderTable() {
-      const prefix = document.getElementById('etfSelect').value;
-      const compareLimit = parseInt(document.getElementById('compareLimitSelect').value, 10);
-
-      if (!prefix) return;
-
-      // Filter for prefix and sort ascending by date
-      let records = parsedFilesData.filter(d => d.prefix === prefix);
-      records.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
-
-      const totalCount = records.length;
-      if (totalCount === 0) {
-        updateBanner(`[${prefix}] ⚠️ 無可用的歷史紀錄`, "text-upColor", "bg-red-50");
-        return;
-      }
-
-      // Slice up to selected limit
-      let selectedRecords = records;
-      if (totalCount > compareLimit) {
-        selectedRecords = records.slice(-compareLimit);
-      }
-
-      const dates = selectedRecords.map(r => r.dateStr);
-      const formattedDates = dates.map(d => d.length === 8 ? `${d.substring(4,6)}/${d.substring(6,8)}` : d);
-
-      // Status text
-      let noticeText = totalCount < compareLimit 
-        ? ` (總紀錄僅 ${totalCount} 期，已降級顯示最大個數)` 
-        : ` (比對最新 ${selectedRecords.length} 期)`;
-
-      updateBanner(
-        `✅ [ETF ${prefix}] 分析區間：${formattedDates[0]} ～ ${formattedDates[formattedDates.length - 1]}${noticeText}`,
-        "text-downColor",
-        "bg-green-50"
-      );
-
-      // Dynamic Table Headers
-      const headerRow = document.getElementById('tableHeaderRow');
-      headerRow.innerHTML = `
-        <th class="p-2.5 border-b cursor-pointer hover:bg-gray-200" onclick="sortTable(0)">股票代號 ⇕</th>
-        <th class="p-2.5 border-b cursor-pointer hover:bg-gray-200" onclick="sortTable(1)">股票名稱 ⇕</th>
-      `;
-
-      // Build periods header
-      const periods = [];
-      for (let i = 0; i < selectedRecords.length - 1; i++) {
-        const d1 = formattedDates[i];
-        const d2 = formattedDates[i + 1];
-        periods.push({
-          prev: selectedRecords[i],
-          curr: selectedRecords[i + 1]
-        });
-        const th = document.createElement('th');
-        th.className = "p-2.5 text-center border-b font-semibold";
-        th.textContent = `${d1} → ${d2}`;
-        headerRow.appendChild(th);
-      }
-
-      // Weight diff header
-      if (selectedRecords.length >= 2) {
-        const thW = document.createElement('th');
-        thW.className = "p-2.5 text-center border-b font-semibold text-textColor cursor-pointer hover:bg-gray-200";
-        thW.textContent = `權重增減(${formattedDates[formattedDates.length - 2]}→${formattedDates[formattedDates.length - 1]}) ⇕`;
-        thW.onclick = () => sortTable(2 + periods.length);
-        headerRow.appendChild(thW);
-      }
-
-      // Collect unique stock codes
-      const codesSet = new Set();
-      selectedRecords.forEach(r => Object.keys(r.portfolio).forEach(c => codesSet.add(c)));
-
-      const latestPortfolio = selectedRecords[selectedRecords.length - 1].portfolio;
-
-      // Default sort by latest weight
-      const sortedCodes = Array.from(codesSet).sort((a, b) => {
-        let wA = latestPortfolio[a] ? latestPortfolio[a].weight : -1;
-        let wB = latestPortfolio[b] ? latestPortfolio[b].weight : -1;
-        return wB - wA;
-      });
-
-      // Prepare row objects
-      currentFilteredRows = sortedCodes.map(code => {
-        let stockName = "";
-        for (let i = selectedRecords.length - 1; i >= 0; i--) {
-          if (selectedRecords[i].portfolio[code]) {
-            stockName = selectedRecords[i].portfolio[code].name;
-            if (stockName) break;
-          }
+            return result;
         }
 
-        const periodDiffs = periods.map(p => {
-          const prevItem = p.prev.portfolio[code];
-          const currItem = p.curr.portfolio[code];
+        function populateEtfComboAndRender() {
+            const etfCombo = document.getElementById('etfCombo');
+            etfCombo.innerHTML = "";
 
-          if (!prevItem && currItem) {
-            return { text: "新建倉", type: "NEW", val: 99999999 };
-          } else if (prevItem && !currItem) {
-            return { text: "已賣光", type: "SOLD", val: -99999999 };
-          } else if (prevItem && currItem) {
-            const diff = currItem.shares - prevItem.shares;
-            if (diff > 0) return { text: `+${formatInt(diff)}`, type: "UP", val: diff };
-            if (diff < 0) return { text: formatInt(diff), type: "DOWN", val: diff };
-            return { text: "0", type: "ZERO", val: 0 };
-          }
-          return { text: "0", type: "ZERO", val: 0 };
-        });
+            let prefixes = Object.keys(globalFilesData);
+            if (prefixes.length === 0) {
+                etfCombo.innerHTML = `<option value="">無可用資料</option>`;
+                return;
+            }
 
-        // Weight Difference
-        let weightDiffVal = 0;
-        let weightDiffText = "-";
-        if (selectedRecords.length >= 2) {
-          const pPrev = selectedRecords[selectedRecords.length - 2].portfolio[code];
-          const pCurr = selectedRecords[selectedRecords.length - 1].portfolio[code];
-          const w1 = pPrev ? pPrev.weight : 0;
-          const w2 = pCurr ? pCurr.weight : 0;
-          weightDiffVal = parseFloat((w2 - w1).toFixed(2));
+            for (let p of prefixes) {
+                let opt = document.createElement('option');
+                opt.value = p;
+                opt.textContent = `ETF 系列: ${p}`;
+                etfCombo.appendChild(opt);
+            }
 
-          if (weightDiffVal > 0) weightDiffText = `↑${weightDiffVal}%`;
-          else if (weightDiffVal < 0) weightDiffText = `↓${Math.abs(weightDiffVal)}%`;
-          else weightDiffText = `0.0%`;
+            renderTable();
         }
 
-        return { code, name: stockName, periodDiffs, weightDiffVal, weightDiffText };
-      });
+        function renderTable() {
+            const prefix = document.getElementById('etfCombo').value;
+            const infoLabel = document.getElementById('infoLabel');
+            if (!prefix || !globalFilesData[prefix]) return;
 
-      renderRows(currentFilteredRows);
-      applyFilter();
-    }
+            const limitCount = parseInt(document.getElementById('compareLimitSelect').value) || 5;
+            let dates = allFileDates[prefix] || [];
+            
+            // 根據選取的個數截取最近的 N 個
+            if (dates.length > limitCount) {
+                dates = dates.slice(-limitCount);
+            }
 
-    // Render Table Rows
-    function renderRows(rows) {
-      const tbody = document.getElementById('tableBody');
-      tbody.innerHTML = '';
+            let formattedDates = dates.map(d => `${d.substring(4, 6)}/${d.substring(6, 8)}`);
+            let dfs = globalFilesData[prefix];
 
-      if (rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="15" class="p-6 text-center text-subText">無符合篩選條件的標的</td></tr>';
-        return;
-      }
+            if (dates.length < 2) {
+                infoLabel.textContent = `[${prefix}] ⚠ 檔案數量不足 2 個，無法進行期數比較`;
+                infoLabel.className = "text-sm text-[#E5484D] px-1 font-medium";
+                document.getElementById('tableBody').innerHTML = "";
+                return;
+            }
 
-      rows.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-blue-50/50 transition border-b border-gray-100";
+            infoLabel.textContent = `[${prefix}] ✅ 已載入 ${dates.length} 個檔案 ｜ 分析區間：${formattedDates[0]} ～ ${formattedDates[-1]}`;
+            infoLabel.className = "text-sm text-[#1A8754] font-semibold px-1";
 
-        // Code
-        const tdCode = document.createElement('td');
-        tdCode.className = "p-2.5 font-bold text-textColor text-center border-r border-gray-100";
-        tdCode.textContent = r.code;
-        tr.appendChild(tdCode);
+            // 收集所有股票代號
+            let allCodes = new Set();
+            for (let d of dates) {
+                if (dfs[d]) {
+                    Object.keys(dfs[d]).forEach(c => allCodes.add(c));
+                }
+            }
 
-        // Name
-        const tdName = document.createElement('td');
-        tdName.className = "p-2.5 font-medium text-textColor border-r border-gray-100";
-        tdName.textContent = r.name;
-        tr.appendChild(tdName);
+            // 以最新一期的權重排序
+            let latestData = dfs[dates[dates.length - 1]] || {};
+            let sortedCodes = Array.from(allCodes).sort((a, b) => {
+                let wA = latestData[a] ? latestData[a]["持股權重"] : -1;
+                let wB = latestData[b] ? latestData[b]["持股權重"] : -1;
+                return wB - wA;
+            });
 
-        // Periods diffs
-        r.periodDiffs.forEach(pd => {
-          const td = document.createElement('td');
-          td.className = "p-2.5 text-center font-medium border-r border-gray-100";
+            // 建立表頭
+            let colHeaders = ["股票代號", "股票名稱"];
+            let comparisonPeriods = [];
+            for (let i = 0; i < dates.length - 1; i++) {
+                comparisonPeriods.push({ prev: dates[i], curr: dates[i+1] });
+                colHeaders.push(`${formattedDates[i]} → ${formattedDates[i+1]}`);
+            }
+            colHeaders.push(`權重增減 (${formattedDates[-2]}→${formattedDates[-1]})`);
 
-          if (pd.type === "UP") td.className += " text-upColor font-semibold";
-          else if (pd.type === "DOWN") td.className += " text-downColor font-semibold";
-          else if (pd.type === "NEW") td.className += " text-newColor font-bold bg-blue-50/60 rounded";
-          else if (pd.type === "SOLD") td.className += " text-soldColor font-semibold";
-          else td.className += " text-zeroColor";
+            let theadHtml = "<tr>";
+            colHeaders.forEach(h => {
+                theadHtml += `<th class="table-cell-custom font-semibold text-center">${h}</th>`;
+            });
+            theadHtml += "</tr>";
+            document.getElementById('tableHeader').innerHTML = theadHtml;
 
-          td.textContent = pd.text;
-          tr.appendChild(td);
-        });
+            // 建立表格內容
+            let tbodyHtml = "";
+            sortedCodes.forEach(code => {
+                let stockName = "";
+                for (let i = dates.length - 1; i >= 0; i--) {
+                    if (dfs[dates[i]] && dfs[dates[i]][code] && dfs[dates[i]][code]["股票名稱"]) {
+                        stockName = dfs[dates[i]][code]["股票名稱"];
+                        break;
+                    }
+                }
 
-        // Weight Difference
-        if (r.weightDiffText !== "-") {
-          const tdW = document.createElement('td');
-          tdW.className = "p-2.5 text-center font-semibold";
-          if (r.weightDiffVal > 0) tdW.className += " text-upColor";
-          else if (r.weightDiffVal < 0) tdW.className += " text-downColor";
-          else tdW.className += " text-zeroColor";
+                tbodyHtml += `<tr class="hover:bg-[#F9FAFB] transition" data-code="${code.toLowerCase()}" data-name="${stockName.toLowerCase()}">`;
+                tbodyHtml += `<td class="table-cell-custom text-center font-bold">${code}</td>`;
+                tbodyHtml += `<td class="table-cell-custom text-left">${stockName}</td>`;
 
-          tdW.textContent = r.weightDiffText;
-          tr.appendChild(tdW);
+                // 各期股數變化
+                comparisonPeriods.forEach(p => {
+                    let dPrev = dfs[p.prev];
+                    let dCurr = dfs[p.curr];
+                    let inPrev = dPrev && dPrev[code];
+                    let inCurr = dCurr && dCurr[code];
+
+                    let valStr = "0";
+                    let colorClass = "text-[#C9CDD4]";
+                    let isBold = false;
+
+                    if (!inPrev && inCurr) {
+                        valStr = "新建倉";
+                        colorClass = "text-[#2F6FED]";
+                        isBold = true;
+                    } else if (inPrev && !inCurr) {
+                        valStr = "已賣光";
+                        colorClass = "text-[#9CA3AF]";
+                    } else if (inPrev && inCurr) {
+                        let diff = Math.round(dCurr[code]["股數"] - dPrev[code]["股數"]);
+                        if (diff > 0) {
+                            valStr = `+${diff.toLocaleString()}`;
+                            colorClass = "text-[#E5484D]";
+                        } else if (diff < 0) {
+                            valStr = `${diff.toLocaleString()}`;
+                            colorClass = "text-[#1A8754]";
+                        } else {
+                            valStr = "0";
+                        }
+                    }
+
+                    tbodyHtml += `<td class="table-cell-custom text-center ${colorClass} ${isBold ? 'font-bold' : ''}">${valStr}</td>`;
+                });
+
+                // 最後一期權重增減
+                let lastDiffStr = "-";
+                let lastDiffColor = "text-[#C9CDD4]";
+                if (dates.length >= 2) {
+                    let sLastD = dates[dates.length - 2];
+                    let lastD = dates[dates.length - 1];
+                    let wPrev = (dfs[sLastD] && dfs[sLastD][code]) ? dfs[sLastD][code]["持股權重"] : 0;
+                    let wCurr = (dfs[lastD] && dfs[lastD][code]) ? dfs[lastD][code]["持股權重"] : 0;
+                    let wDiff = Math.round((wCurr - wPrev) * 100) / 100;
+
+                    if (wDiff > 0) {
+                        lastDiffStr = `↑${wDiff}%`;
+                        lastDiffColor = "text-[#E5484D]";
+                    } else if (wDiff < 0) {
+                        lastDiffStr = `↓${Math.abs(wDiff)}%`;
+                        lastDiffColor = "text-[#1A8754]";
+                    } else {
+                        lastDiffStr = "0.0%";
+                    }
+                }
+                tbodyHtml += `<td class="table-cell-custom text-center font-semibold ${lastDiffColor}">${lastDiffStr}</td>`;
+                tbodyHtml += `</tr>`;
+            });
+
+            document.getElementById('tableBody').innerHTML = tbodyHtml;
+            applyFilter();
         }
 
-        tbody.appendChild(tr);
-      });
+        function applyFilter() {
+            const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+            const rows = document.querySelectorAll('#tableBody tr');
+            let visibleCount = 0;
 
-      document.getElementById('recordCount').textContent = `共 ${rows.length} 檔標的`;
-    }
-
-    // Filter Logic
-    function applyFilter() {
-      const keyword = document.getElementById('filterInput').value.trim().toLowerCase();
-      if (!keyword) {
-        renderRows(currentFilteredRows);
-        return;
-      }
-
-      const filtered = currentFilteredRows.filter(r => 
-        r.code.toLowerCase().includes(keyword) || 
-        r.name.toLowerCase().includes(keyword)
-      );
-
-      renderRows(filtered);
-    }
-
-    // Sort Table Logic
-    function sortTable(colIndex) {
-      sortDirections[colIndex] = !sortDirections[colIndex];
-      const asc = sortDirections[colIndex];
-
-      currentFilteredRows.sort((a, b) => {
-        let vA, vB;
-        if (colIndex === 0) {
-          vA = a.code; vB = b.code;
-        } else if (colIndex === 1) {
-          vA = a.name; vB = b.name;
-        } else {
-          vA = a.weightDiffVal; vB = b.weightDiffVal;
+            rows.forEach(row => {
+                let code = row.getAttribute('data-code') || "";
+                let name = row.getAttribute('data-name') || "";
+                if (code.includes(keyword) || name.includes(keyword)) {
+                    row.style.display = "";
+                    visibleCount++;
+                } else {
+                    row.style.display = "none";
+                }
+            });
         }
-
-        if (typeof vA === 'string') {
-          return asc ? vA.localeCompare(vB) : vB.localeCompare(vA);
-        } else {
-          return asc ? vA - vB : vB - vA;
-        }
-      });
-
-      applyFilter();
-    }
-  </script>
+    </script>
 </body>
 </html>
