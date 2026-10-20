@@ -133,7 +133,7 @@
 
                 for (let file of files) {
                     const fname = file.name;
-                    let m = fname.match(/report_(\d{8})\.json$/i) \vert{}\vert{} fname.match(/_(\d{8})\.json$/i);
+                    let m = fname.match(/report_(\d{8})\.json$/i) || fname.match(/_(\d{8})\.json$/i);
                     if (m) {
                         let dateStr = m[1];
                         dateFileMap[dateStr] = file.download_url;
@@ -274,7 +274,7 @@
                 return;
             }
 
-            infoLabel.textContent = `[${prefix}] ✅ 已載入 ${dates.length} 個檔案 ｜ 分析區間：${formattedDates[0]} ～ ${formattedDates[-1]}`;
+            infoLabel.textContent = `[${prefix}] ✅ 已載入 ${dates.length} 個檔案 ｜ 分析區間：${formattedDates[0]} ～ ${formattedDates[formattedDates.length - 1]}`;
             infoLabel.className = "text-sm text-[#1A8754] font-semibold px-1";
 
             let allCodes = new Set();
@@ -298,7 +298,7 @@
                 comparisonPeriods.push({ prev: dates[i], curr: dates[i+1] });
                 colHeaders.push(`${formattedDates[i]} → ${formattedDates[i+1]}`);
             }
-            colHeaders.push(`權重增減 (${formattedDates[-2]}→${formattedDates[-1]})`);
+            colHeaders.push(`權重增減 (${formattedDates[formattedDates.length - 2]}→${formattedDates[formattedDates.length - 1]})`);
 
             let theadHtml = "<tr>";
             colHeaders.forEach(h => {
