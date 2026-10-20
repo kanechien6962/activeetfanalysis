@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
 
-OUTPUT_DIR = Path("etf_data")
+OUTPUT_DIR = Path("etf-data")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 # GitHub Actions 主機是 UTC，必須明確使用台灣時區，否則日期可能差一天
