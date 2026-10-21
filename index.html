@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ETF Portfolio Analysis (GitHub JSON Version)</title>
+    <title>ETF Portfolio Analysis & Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
         .table-cell-custom { padding: 6px 10px; white-space: nowrap; }
     </style>
@@ -12,16 +13,16 @@
 <body class="bg-[#F5F6FA] text-[#1F2430] font-sans antialiased">
     <div class="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
         
-        <!-- 頂部標題卡片 -->
-        <div class="bg-white rounded-xl shadow-sm border border-[#E3E5EA] p-6 space-y-4">
+        <!-- 頂部標題與控制卡片 -->
+        <div class="bg-white rounded-xl shadow-sm border border-[#E3E5EA] p-6 space-y-5">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 class="text-2xl font-bold text-[#1F2430]">ETF 投資組合變動分析</h1>
-                    <p class="text-sm text-[#6B7280] mt-1">透過 GitHub JSON 資料自動比對各期持股與權重變化</p>
+                    <h1 class="text-2xl font-bold text-[#1F2430]"><span>📊</span>ETF 投資組合變動分析與儀表板</h1>
+                    <p class="text-sm text-[#6B7280] mt-1">資料自動分析持股變動、資金流向與歷史趨勢</p>
                 </div>
                 <!-- 比對個數選擇 -->
                 <div class="flex items-center space-x-2">
-                    <label class="text-sm font-semibold text-[#1F2430]">比對日數:</label>
+                    <label class="text-sm font-semibold text-[#1F2430]">比對天數:</label>
                     <select id="compareLimitSelect" class="border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[#2F6FED]">
                         <option value="5" selected>最近 5 日</option>
                         <option value="10">最近 10 日</option>
@@ -31,42 +32,85 @@
                 </div>
             </div>
 
-            <!-- GitHub 設定列 -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[#E3E5EA]">
-                <div>
-                    <label class="block text-xs font-semibold text-[#6B7280] mb-1">GitHub Repo (owner/repo)</label>
-                    <input type="text" id="ghRepoInput" value="kanechien6962/activeetfanalysis" readonly class="w-full border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm bg-[#F9FAFB] text-[#6B7280]">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-[#6B7280] mb-1">分支 (Branch)</label>
-                    <input type="text" id="ghBranchInput" value="main" readonly class="w-full border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm bg-[#F9FAFB] text-[#6B7280]">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-[#6B7280] mb-1">資料夾路徑 (Folder Path)</label>
-                    <div class="flex space-x-2">
-                        <input type="text" id="ghPathInput" value="etf-data" readonly class="w-full border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm bg-[#F9FAFB] text-[#6B7280]">
-                        <button type="button" onclick="loadDataFromGitHub()" class="bg-[#2F6FED] hover:bg-[#255ACB] text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition shrink-0">讀取</button>
-                    </div>
-                </div>
+            <!-- 隱藏的 GitHub 設定欄位 -->
+            <div class="hidden">
+                <input type="text" id="ghRepoInput" value="kanechien6962/activeetfanalysis">
+                <input type="text" id="ghBranchInput" value="main">
+                <input type="text" id="ghPathInput" value="etf-data">
             </div>
 
-            <!-- ETF 選擇與即時搜尋 -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <div class="flex items-center space-x-3">
-                    <label class="text-sm font-semibold w-16 shrink-0">ETF 系列</label>
-                    <select id="etfCombo" class="w-full border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[#2F6FED]">
+            <!-- ETF 選擇、篩選標的 與 讀取按鈕排在同一列 -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 pt-2 border-t border-[#E3E5EA] items-center">
+                <!-- ETF 系列 -->
+                <div class="md:col-span-4 flex items-center space-x-2">
+                    <label class="text-sm font-semibold shrink-0">ETF</label>
+                    <select id="etfCombo" class="w-full border border-[#E3E5EA] rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#2F6FED]">
                         <option value="">請先載入資料...</option>
                     </select>
                 </div>
-                <div class="flex items-center space-x-3">
-                    <label class="text-sm font-semibold w-16 shrink-0">篩選標的</label>
-                    <input type="text" id="searchInput" placeholder="輸入代號或名稱 (例: 2330 或 台積電)..." class="w-full border border-[#E3E5EA] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#2F6FED]">
+                <!-- 篩選標的 -->
+                <div class="md:col-span-5 flex items-center space-x-2">
+                    <label class="text-sm font-semibold shrink-0">篩選</label>
+                    <input type="text" id="searchInput" placeholder="輸入代號或名稱 (例: 2330)..." class="w-full border border-[#E3E5EA] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2F6FED]">
+                </div>
+                <!-- 讀取按鈕 (精緻化設計，放在右側) -->
+                <div class="md:col-span-3">
+                    <button type="button" id="loadBtn" class="w-full bg-[#2F6FED] hover:bg-[#255ACB] active:bg-[#1E48A6] text-white py-2 px-4 rounded-lg font-semibold text-sm shadow-sm transition flex items-center justify-center space-x-1.5">
+                        <span>🔄 載入 GitHub 資料</span>
+                    </button>
                 </div>
             </div>
         </div>
 
         <!-- 狀態與提示訊息 -->
-        <div id="infoLabel" class="text-sm text-[#6B7280] px-1 font-medium">請點擊讀取按鈕以載入 GitHub 資料</div>
+        <div id="infoLabel" class="text-sm text-[#6B7280] px-1 font-medium">請點擊上方「載入 GitHub 資料」按鈕開始分析</div>
+
+        <!-- 📊 關鍵訊息區 (儀表板區塊) -->
+        <div id="dashboardSection" class="grid grid-cols-1 md:grid-cols-2 gap-6 hidden">
+            <div class="bg-white rounded-xl shadow-sm border border-[#E3E5EA] p-5 space-y-3">
+                <h3 class="text-base font-bold text-[#1F2430]">🚨 大動作建倉 / 清倉警示牆</h3>
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div class="bg-[#F0F7FF] p-3 rounded-lg border border-[#DCE7FF]">
+                        <span class="font-semibold text-[#2F6FED] block mb-1">🟢 區間新建倉標的</span>
+                        <div id="newBuiltList" class="text-xs text-[#1F2430] space-y-1 max-h-36 overflow-y-auto">無</div>
+                    </div>
+                    <div class="bg-[#F9FAFB] p-3 rounded-lg border border-[#E3E5EA]">
+                        <span class="font-semibold text-[#9CA3AF] block mb-1">⚪ 區間已賣光標的</span>
+                        <div id="soldOutList" class="text-xs text-[#1F2430] space-y-1 max-h-36 overflow-y-auto">無</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-[#E3E5EA] p-5 space-y-3">
+                <h3 class="text-base font-bold text-[#1F2430]">🏆 區間權重增減 Top 5 排行榜</h3>
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div class="bg-[#FFF5F5] p-3 rounded-lg border border-[#FFE3E3]">
+                        <span class="font-semibold text-[#E5484D] block mb-1">📈 權重增加最多 Top 5</span>
+                        <div id="topGainersList" class="text-xs text-[#1F2430] space-y-1 max-h-36 overflow-y-auto">無</div>
+                    </div>
+                    <div class="bg-[#F2FBF7] p-3 rounded-lg border border-[#D1EFE2]">
+                        <span class="font-semibold text-[#1A8754] block mb-1">📉 權重減少最多 Top 5</span>
+                        <div id="topLosersList" class="text-xs text-[#1F2430] space-y-1 max-h-36 overflow-y-auto">無</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 📈 圖表區 -->
+        <div id="chartSection" class="grid grid-cols-1 lg:grid-cols-2 gap-6 hidden">
+            <div class="bg-white rounded-xl shadow-sm border border-[#E3E5EA] p-5 space-y-3">
+                <h3 class="text-base font-bold text-[#1F2430]">📊 區間前 10 大持股權重歷史趨勢</h3>
+                <div class="relative h-72">
+                    <canvas id="top10TrendChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-[#E3E5EA] p-5 space-y-3">
+                <h3 class="text-base font-bold text-[#1F2430]">📊 最近一日權重增減 Top 5 排行</h3>
+                <div class="relative h-72">
+                    <canvas id="top5DiffBarChart"></canvas>
+                </div>
+            </div>
+        </div>
 
         <!-- 表格容器 -->
         <div class="bg-white rounded-xl shadow-sm border border-[#E3E5EA] overflow-hidden">
@@ -78,9 +122,7 @@
                             <th class="table-cell-custom font-semibold">股票名稱</th>
                         </tr>
                     </thead>
-                    <tbody id="tableBody" class="divide-y divide-[#E3E5EA]">
-                        <!-- 動態生成列 -->
-                    </tbody>
+                    <tbody id="tableBody" class="divide-y divide-[#E3E5EA]"></tbody>
                 </table>
             </div>
         </div>
@@ -95,14 +137,17 @@
     </div>
 
     <script>
-        let globalFilesData = {};
-        let allFileDates = {};
+        let globalFilesData = {}; 
+        let allFileDates = {};   
+        let top10ChartInstance = null;
+        let top5BarChartInstance = null;
 
-        document.getElementById('etfCombo').addEventListener('change', renderTable);
+        document.getElementById('loadBtn').addEventListener('click', loadDataFromGitHub);
+        document.getElementById('etfCombo').addEventListener('change', renderAll);
         document.getElementById('searchInput').addEventListener('input', applyFilter);
         document.getElementById('compareLimitSelect').addEventListener('change', () => {
             if (Object.keys(globalFilesData).length > 0) {
-                populateEtfComboAndRender();
+                loadDataFromGitHub();
             }
         });
 
@@ -111,11 +156,6 @@
             const branch = document.getElementById('ghBranchInput').value.trim() || 'main';
             const path = document.getElementById('ghPathInput').value.trim();
             const infoLabel = document.getElementById('infoLabel');
-
-            if (!repo) {
-                alert('請輸入 GitHub Repository (owner/repo)');
-                return;
-            }
 
             infoLabel.textContent = "正在向 GitHub 要求檔案清單...";
             infoLabel.className = "text-sm text-[#2F6FED] px-1 font-medium";
@@ -133,7 +173,7 @@
 
                 for (let file of files) {
                     const fname = file.name;
-                    let m = fname.match(/report_(\d{8})\.json$/i) || fname.match(/_(\d{8})\.json$/i);
+                    let m = fname.match(/^report_(\d{8})\.json$/i);
                     if (m) {
                         let dateStr = m[1];
                         dateFileMap[dateStr] = file.download_url;
@@ -143,13 +183,15 @@
                 let sortedDates = Object.keys(dateFileMap).sort((a, b) => a.localeCompare(b));
 
                 if (sortedDates.length === 0) {
-                    infoLabel.textContent = "⚠ 找不到符合格式的 JSON 檔案（需包含 YYYYMMDD 日期，例如 report_20261019.json）";
+                    infoLabel.textContent = "⚠ 找不到符合格式的 JSON 檔案";
                     infoLabel.className = "text-sm text-[#E5484D] px-1 font-medium";
                     return;
                 }
 
                 const limitCount = parseInt(document.getElementById('compareLimitSelect').value) || 5;
-                let selectedDates = sortedDates.slice(-limitCount);
+                // 為了讓使用者選 N 天時，第一天能跟前一天比較，必須多抓 1 天（總共抓 limitCount + 1 天）
+                let fetchCount = limitCount + 1;
+                let selectedDates = sortedDates.slice(-fetchCount);
 
                 infoLabel.textContent = "正在下載並解析 JSON 內容...";
 
@@ -236,6 +278,7 @@
 
         function populateEtfComboAndRender() {
             const etfCombo = document.getElementById('etfCombo');
+            const prevSelected = etfCombo.value;
             etfCombo.innerHTML = "";
 
             let prefixes = Object.keys(globalFilesData).filter(p => Object.keys(globalFilesData[p]).length > 0);
@@ -253,10 +296,11 @@
                 etfCombo.appendChild(opt);
             });
 
-            renderTable();
+            if (prefixes.includes(prevSelected)) etfCombo.value = prevSelected;
+            renderAll();
         }
 
-        function renderTable() {
+        function renderAll() {
             const prefix = document.getElementById('etfCombo').value;
             const infoLabel = document.getElementById('infoLabel');
             if (!prefix || !globalFilesData[prefix]) return;
@@ -268,20 +312,154 @@
             let dfs = globalFilesData[prefix];
 
             if (dates.length < 2) {
-                infoLabel.textContent = `[${prefix}] ⚠ 可用日期檔案少於 2 個，無法進行期數比較`;
+                infoLabel.textContent = `[${prefix}] ⚠ 可用天數檔案少於 2 個，無法進行天數比較與儀表板分析`;
                 infoLabel.className = "text-sm text-[#E5484D] px-1 font-medium";
                 document.getElementById('tableBody').innerHTML = "";
+                document.getElementById('dashboardSection').classList.add('hidden');
+                document.getElementById('chartSection').classList.add('hidden');
                 return;
             }
 
             infoLabel.textContent = `[${prefix}] ✅ 已載入 ${dates.length} 個檔案 ｜ 分析區間：${formattedDates[0]} ～ ${formattedDates[formattedDates.length - 1]}`;
             infoLabel.className = "text-sm text-[#1A8754] font-semibold px-1";
 
+            document.getElementById('dashboardSection').classList.remove('hidden');
+            document.getElementById('chartSection').classList.remove('hidden');
+
+            renderTable(dates, formattedDates, dfs);
+            updateDashboardMetrics(dates, dfs);
+            try {
+                if (typeof Chart === 'undefined') throw new Error('Chart.js 未載入（可能是 CDN 被擋）');
+                renderCharts(dates, formattedDates, dfs);
+            } catch (err) {
+                console.error(err);
+                document.getElementById('chartSection').classList.add('hidden');
+            }
+        }
+
+        function updateDashboardMetrics(dates, dfs) {
+            let firstDate = dates[0];
+            let lastDate = dates[dates.length - 1];
+
+            let firstData = dfs[firstDate] || {};
+            let lastData = dfs[lastDate] || {};
+
+            let newBuilt = [];
+            let soldOut = [];
+
+            let allCodes = new Set();
+            dates.forEach(d => Object.keys(dfs[d] || {}).forEach(c => allCodes.add(c)));
+
+            allCodes.forEach(code => {
+                let inFirst = firstData[code] !== undefined;
+                let inLast = lastData[code] !== undefined;
+                let name = lastData[code]?.["股票名稱"] || firstData[code]?.["股票名稱"] || code;
+
+                if (!inFirst && inLast) {
+                    newBuilt.push(`${code} ${name}`);
+                } else if (inFirst && !inLast) {
+                    soldOut.push(`${code} ${name}`);
+                }
+            });
+
+            document.getElementById('newBuiltList').innerHTML = newBuilt.length > 0 ? newBuilt.map(x => `<div>• ${x}</div>`).join('') : '<span class="text-gray-400">無</span>';
+            document.getElementById('soldOutList').innerHTML = soldOut.length > 0 ? soldOut.map(x => `<div>• ${x}</div>`).join('') : '<span class="text-gray-400">無</span>';
+
+            let diffList = [];
+            allCodes.forEach(code => {
+                // 區間 = 第一期 → 最後一期
+                let wPrev = firstData[code]?.["持股權重"] || 0;
+                let wCurr = lastData[code]?.["持股權重"] || 0;
+                let diff = Math.round((wCurr - wPrev) * 100) / 100;
+                let name = lastData[code]?.["股票名稱"] || firstData[code]?.["股票名稱"] || code;
+                diffList.push({ code, name, diff });
+            });
+
+            diffList.sort((a, b) => b.diff - a.diff);
+            let topGainers = diffList.filter(x => x.diff > 0).slice(0, 5);
+            let topLosers = [...diffList].filter(x => x.diff < 0).sort((a, b) => a.diff - b.diff).slice(0, 5);
+
+            document.getElementById('topGainersList').innerHTML = topGainers.length > 0 ? topGainers.map(x => `<div>• ${x.code} ${x.name}: <span class="text-[#E5484D] font-bold">+${x.diff}%</span></div>`).join('') : '<span class="text-gray-400">無增幅</span>';
+            document.getElementById('topLosersList').innerHTML = topLosers.length > 0 ? topLosers.map(x => `<div>• ${x.code} ${x.name}: <span class="text-[#1A8754] font-bold">${x.diff}%</span></div>`).join('') : '<span class="text-gray-400">無減幅</span>';
+        }
+
+        function renderCharts(dates, formattedDates, dfs) {
+            let lastDate = dates[dates.length - 1];
+            let latestData = dfs[lastDate] || {};
+
+            let sortedCodes = Object.keys(latestData).sort((a, b) => latestData[b]["持股權重"] - latestData[a]["持股權重"]);
+            let top10Codes = sortedCodes.slice(0, 10);
+
+            let lineDatasets = top10Codes.map((code, idx) => {
+                let name = latestData[code]["股票名稱"] || code;
+                let dataPoints = dates.map(d => dfs[d]?.[code]?.["持股權重"] || 0);
+                const colors = ['#2F6FED', '#E5484D', '#1A8754', '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6', '#6366F1', '#84CC16', '#F97316'];
+                return {
+                    label: `${code} ${name}`,
+                    data: dataPoints,
+                    borderColor: colors[idx % colors.length],
+                    backgroundColor: colors[idx % colors.length],
+                    borderWidth: 2,
+                    tension: 0.1
+                };
+            });
+
+            const ctx1 = document.getElementById('top10TrendChart').getContext('2d');
+            if (top10ChartInstance) top10ChartInstance.destroy();
+            top10ChartInstance = new Chart(ctx1, {
+                type: 'line',
+                data: { labels: formattedDates, datasets: lineDatasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+                    scales: { y: { title: { display: true, text: '權重 (%)' } } }
+                }
+            });
+
+            let secondLastDate = dates.length >= 2 ? dates[dates.length - 2] : dates[0];
+            let secondLastData = dfs[secondLastDate] || {};
+            let allDiffs = [];
+            let diffCodes = new Set([...Object.keys(latestData), ...Object.keys(secondLastData)]);
+            diffCodes.forEach(code => {
+                let wPrev = secondLastData[code]?.["持股權重"] || 0;
+                let wCurr = latestData[code]?.["持股權重"] || 0;
+                let diff = Math.round((wCurr - wPrev) * 100) / 100;
+                let name = latestData[code]?.["股票名稱"] || secondLastData[code]?.["股票名稱"] || code;
+                allDiffs.push({ label: `${code} ${name}`, diff });
+            });
+
+            // 增加最多 5 檔 + 減少最多 5 檔（只取真的有增減的，避免重複或 0 值）
+            let gainers = allDiffs.filter(x => x.diff > 0).sort((a, b) => b.diff - a.diff).slice(0, 5);
+            let losers = allDiffs.filter(x => x.diff < 0).sort((a, b) => a.diff - b.diff).slice(0, 5);
+            let top5BarData = [...gainers, ...losers];
+
+            const ctx2 = document.getElementById('top5DiffBarChart').getContext('2d');
+            if (top5BarChartInstance) top5BarChartInstance.destroy();
+            top5BarChartInstance = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: top5BarData.map(x => x.label),
+                    datasets: [{
+                        label: '權重變動 (%)',
+                        data: top5BarData.map(x => x.diff),
+                        backgroundColor: top5BarData.map(x => x.diff >= 0 ? '#E5484D' : '#1A8754'),
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { title: { display: true, text: '增減幅度 (%)' } } }
+                }
+            });
+        }
+
+        function renderTable(dates, formattedDates, dfs) {
             let allCodes = new Set();
             dates.forEach(d => {
-                if (dfs[d]) {
-                    Object.keys(dfs[d]).forEach(c => allCodes.add(c));
-                }
+                if (dfs[d]) Object.keys(dfs[d]).forEach(c => allCodes.add(c));
             });
 
             let latestDate = dates[dates.length - 1];
@@ -292,13 +470,31 @@
                 return wB - wA;
             });
 
+            // 取得使用者設定的顯示天數限制 (例如 5)
+            const limitCount = parseInt(document.getElementById('compareLimitSelect').value) || 5;
+
+            // 從抓到的資料中，取最後 N 天來作為畫面上要顯示的日期欄位 (例如 10/14, 10/15, 10/16, 10/19, 10/20)
+            let displayDates = dates.slice(-limitCount);
+            let displayFormattedDates = formattedDates.slice(-limitCount);
+
             let colHeaders = ["股票代號", "股票名稱"];
             let comparisonPeriods = [];
-            for (let i = 0; i < dates.length - 1; i++) {
-                comparisonPeriods.push({ prev: dates[i], curr: dates[i+1] });
-                colHeaders.push(`${formattedDates[i]} → ${formattedDates[i+1]}`);
-            }
-            colHeaders.push(`權重增減 (${formattedDates[formattedDates.length - 2]}→${formattedDates[formattedDates.length - 1]})`);
+
+            // 建立每一個顯示日期的變動區間（確保每一天都準確對應「前一日 → 當日」）
+            displayDates.forEach(dStr => {
+                let realIdx = dates.indexOf(dStr);
+                if (realIdx > 0) {
+                    comparisonPeriods.push({ prev: dates[realIdx - 1], curr: dStr });
+                }
+            });
+
+            // 加上表頭：各顯示日期
+            displayFormattedDates.forEach(dFmt => {
+                colHeaders.push(dFmt);
+            });
+            
+            // 最後一欄：顯示最後一天的權重增減（例如 10/20權重增減）
+            colHeaders.push(`${displayFormattedDates[displayFormattedDates.length - 1]}權重增減`);
 
             let theadHtml = "<tr>";
             colHeaders.forEach(h => {
@@ -321,6 +517,7 @@
                 tbodyHtml += `<td class="table-cell-custom text-center font-bold">${code}</td>`;
                 tbodyHtml += `<td class="table-cell-custom text-left">${stockName}</td>`;
 
+                // 依序填入每個顯示日期的股數變動
                 comparisonPeriods.forEach(p => {
                     let dPrev = dfs[p.prev];
                     let dCurr = dfs[p.curr];
@@ -354,11 +551,13 @@
                     tbodyHtml += `<td class="table-cell-custom text-center ${colorClass} ${isBold ? 'font-bold' : ''}">${valStr}</td>`;
                 });
 
+                // 最後一欄：正確計算顯示區間中最後兩天的權重增減（例如 10/19 → 10/20 的權重差值）
                 let lastDiffStr = "-";
                 let lastDiffColor = "text-[#C9CDD4]";
-                if (dates.length >= 2) {
-                    let sLastD = dates[dates.length - 2];
-                    let lastD = dates[dates.length - 1];
+                if (displayDates.length >= 2) {
+                    let sLastD = displayDates[displayDates.length - 2]; // 倒數第二天 (10/19)
+                    let lastD = displayDates[displayDates.length - 1];  // 最後一天 (10/20)
+                    
                     let wPrev = (dfs[sLastD] && dfs[sLastD][code]) ? dfs[sLastD][code]["持股權重"] : 0;
                     let wCurr = (dfs[lastD] && dfs[lastD][code]) ? dfs[lastD][code]["持股權重"] : 0;
                     let wDiff = Math.round((wCurr - wPrev) * 100) / 100;
@@ -384,14 +583,11 @@
         function applyFilter() {
             const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
             const rows = document.querySelectorAll('#tableBody tr');
-            let visibleCount = 0;
-
             rows.forEach(row => {
                 let code = row.getAttribute('data-code') || "";
                 let name = row.getAttribute('data-name') || "";
                 if (code.includes(keyword) || name.includes(keyword)) {
                     row.style.display = "";
-                    visibleCount++;
                 } else {
                     row.style.display = "none";
                 }
