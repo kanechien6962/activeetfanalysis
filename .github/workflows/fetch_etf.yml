@@ -4,7 +4,7 @@ on:
   schedule:
     # UTC 10:00 = 台灣時間 18:18，週一到週五
     # - cron: "7 10 * * 1-5"
-    - cron: "*/5 * * * * *"
+    - cron: "*/4 * * * * *"
   workflow_dispatch: # 可手動觸發測試
 
 permissions:
