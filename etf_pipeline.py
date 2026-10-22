@@ -14,7 +14,12 @@ OUTPUT_DIR = Path("etf-data")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 # GitHub Actions 主機是 UTC，必須明確使用台灣時區，否則日期可能差一天
-TODAY_STR = datetime.now(ZoneInfo("Asia/Taipei")).strftime("%Y%m%d")
+now = datetime.now(ZoneInfo("Asia/Taipei"))
+
+if now.hour < 17:
+    TODAY_STR = (now - timedelta(days=1)).strftime("%Y%m%d")
+else:
+    TODAY_STR = now.strftime("%Y%m%d")
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; etf-pipeline/1.0)"}
 
