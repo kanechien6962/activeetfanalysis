@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Countdown & Attendance Tracker Widget</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: rgba(30, 30, 30, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(8px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .time-value {
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-4 min-h-screen text-white relative overflow-x-hidden">
+
+    <!-- Top Toolbar Controls -->
+    <div class="w-full max-w-xl flex justify-between items-center mb-6 px-2">
+        <div class="flex items-center space-x-2 bg-slate-900/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-700/50">
+            <span class="text-xs text-slate-400 font-medium">Opacity</span>
+            <input type="range" id="opacitySlider" min="0.2" max="1" step="0.05" value="0.95" 
+                   class="w-24 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+        </div>
+
+        <div class="flex space-x-2">
+            <button id="manualTimeBtn" title="Manual Time Picker" 
+                    class="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 rounded-full text-xs font-medium transition flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>Manual Punch</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Widget Container -->
+    <div id="mainWidget" class="glass-panel w-full max-w-xl rounded-3xl p-6 md:p-8 transition-all duration-300">
+        <!-- Title Header -->
+        <div class="text-center mb-6">
+            <h1 id="widgetTitle" class="text-sm md:text-base font-bold tracking-widest text-slate-200 uppercase">
+                COUNTDOWN TO 2027/04/30
+            </h1>
+        </div>
+
+        <!-- Timer Grid -->
+        <div class="grid grid-cols-4 gap-2 md:gap-4 mb-8">
+            <div class="glass-card rounded-2xl p-3 text-center flex flex-col justify-center items-center">
+                <span id="days" class="time-value text-2xl md:text-4xl font-extrabold text-white">00</span>
+                <span class="text-[10px] md:text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">Days</span>
+            </div>
+            <div class="glass-card rounded-2xl p-3 text-center flex flex-col justify-center items-center">
+                <span id="hours" class="time-value text-2xl md:text-4xl font-extrabold text-white">00</span>
+                <span class="text-[10px] md:text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">Hours</span>
+            </div>
+            <div class="glass-card rounded-2xl p-3 text-center flex flex-col justify-center items-center">
+                <span id="minutes" class="time-value text-2xl md:text-4xl font-extrabold text-white">00</span>
+                <span class="text-[10px] md:text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">Minutes</span>
+            </div>
+            <div class="glass-card rounded-2xl p-3 text-center flex flex-col justify-center items-center">
+                <span id="seconds" class="time-value text-2xl md:text-4xl font-extrabold text-indigo-400">00</span>
+                <span class="text-[10px] md:text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">Seconds</span>
+            </div>
+        </div>
+
+        <!-- Bottom Info Row -->
+        <div class="grid grid-cols-3 items-center text-xs md:text-sm text-slate-300 border-t border-white/10 pt-4">
+            <div id="leftTime" class="text-left font-mono font-medium truncate text-slate-300">
+                --:--
+            </div>
+
+            <div class="text-center">
+                <button id="refreshBtn" 
+                        class="px-3 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition font-medium cursor-pointer inline-flex items-center justify-center gap-1">
+                    <span id="messageText">Keep Going</span>
+                    <svg id="spinner" class="animate-spin h-3.5 w-3.5 hidden text-indigo-400" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div id="rightTime" class="text-right font-mono font-medium truncate text-emerald-400">
+                --:--
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Punch Modal -->
+    <div id="manualModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="glass-panel w-full max-w-sm rounded-2xl p-6 border border-slate-700">
+            <h3 class="text-base font-bold text-white mb-3">Set Manual Punch-In Time</h3>
+            <p class="text-xs text-slate-400 mb-4">Choose a time to test the automatic 9-hour shift calculation.</p>
+            <div class="mb-4">
+                <label class="block text-xs font-medium text-slate-300 mb-1">Entry Time</label>
+                <input type="datetime-local" id="manualInput" 
+                       class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div class="flex justify-end space-x-2">
+                <button id="closeManualBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700">Cancel</button>
+                <button id="applyManualBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-500">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const TARGET_DATE = new Date(2027, 3, 30, 0, 0, 0);
+
+        const daysEl = document.getElementById('days');
+        const hoursEl = document.getElementById('hours');
+        const minutesEl = document.getElementById('minutes');
+        const secondsEl = document.getElementById('seconds');
+
+        const leftTimeEl = document.getElementById('leftTime');
+        const rightTimeEl = document.getElementById('rightTime');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const messageText = document.getElementById('messageText');
+        const spinner = document.getElementById('spinner');
+        const opacitySlider = document.getElementById('opacitySlider');
+        const mainWidget = document.getElementById('mainWidget');
+
+        const manualTimeBtn = document.getElementById('manualTimeBtn');
+        const manualModal = document.getElementById('manualModal');
+        const manualInput = document.getElementById('manualInput');
+        const closeManualBtn = document.getElementById('closeManualBtn');
+        const applyManualBtn = document.getElementById('applyManualBtn');
+
+        function padZero(num) {
+            return String(num).padStart(2, '0');
+        }
+
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = padZero(date.getMonth() + 1);
+            const day = padZero(date.getDate());
+            const hours = padZero(date.getHours());
+            const minutes = padZero(date.getMinutes());
+            return `${year}/${month}/${day} ${hours}:${minutes}`;
+        }
+
+        function updateCountdown() {
+            const now = new Date();
+            const diff = TARGET_DATE - now;
+
+            if (diff <= 0) {
+                daysEl.textContent = "00";
+                hoursEl.textContent = "00";
+                minutesEl.textContent = "00";
+                secondsEl.textContent = "00";
+                return;
+            }
+
+            const totalSeconds = Math.floor(diff / 1000);
+            const days = Math.floor(totalSeconds / 86400);
+            const hours = Math.floor((totalSeconds % 86400) / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            daysEl.textContent = padZero(days);
+            hoursEl.textContent = padZero(hours);
+            minutesEl.textContent = padZero(minutes);
+            secondsEl.textContent = padZero(seconds);
+        }
+
+        function setPunchTimes(entryDate) {
+            leftTimeEl.textContent = formatDate(entryDate);
+            const exitDate = new Date(entryDate.getTime() + (9 * 60 * 60 * 1000));
+            rightTimeEl.textContent = formatDate(exitDate);
+        }
+
+        // 讀取 GitHub Actions 產生的 data.json 靜態檔
+        async function fetchAttendanceData() {
+            messageText.classList.add('hidden');
+            spinner.classList.remove('hidden');
+
+            try {
+                // 加上 timestamp 防止瀏覽器快取 data.json
+                const res = await fetch(`data.json?t=${new Date().getTime()}`);
+                if (!res.ok) throw new Error("Data file not found");
+                
+                const data = await res.json();
+                if (data.status === "success") {
+                    leftTimeEl.textContent = data.entry_time;
+                    rightTimeEl.textContent = data.exit_time;
+                } else {
+                    leftTimeEl.textContent = data.entry_time || "--:--";
+                    rightTimeEl.textContent = data.exit_time || "--:--";
+                }
+            } catch (err) {
+                console.error("Fetch Data Error:", err);
+                leftTimeEl.textContent = "No Data";
+                rightTimeEl.textContent = "--:--";
+            } finally {
+                spinner.classList.add('hidden');
+                messageText.classList.remove('hidden');
+            }
+        }
+
+        opacitySlider.addEventListener('input', (e) => {
+            mainWidget.style.opacity = e.target.value;
+        });
+
+        // GitHub 設定 (請填入你的資訊)
+        const GITHUB_OWNER = "kanechien6962";
+        const GITHUB_REPO = "activeetfanalysis";
+        const GITHUB_PAT = "YOUR_TOKEN_HERE"; // 需具備 repo 權限
+
+        // 點擊重新整理按鈕時：先觸發 GitHub Action，再讀取資料
+        refreshBtn.addEventListener('click', async () => {
+            messageText.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            leftTimeEl.textContent = "觸發同步中...";
+
+            try {
+                // 1. 發送請求至 GitHub API 觸發 Workflow
+                const dispatchRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/dispatches`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${GITHUB_PAT}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        event_type: 'trigger-fetch'
+                    })
+                });
+
+                if (!dispatchRes.ok) {
+                    throw new Error("無法觸發 GitHub Actions，請檢查 Token 或網路設定。");
+                }
+
+                // 2. 因為 GitHub Actions 執行需要時間（約 10~30 秒），等待一段時間後再抓取更新後的 data.json
+                console.log("GitHub Action 已成功觸發，等待執行完成...");
+                
+                setTimeout(async () => {
+                    await fetchAttendanceData();
+                }, 30000); // 預設等待 30 秒讓 python 執行並 push 完畢
+
+            } catch (err) {
+                console.error("Trigger Error:", err);
+                leftTimeEl.textContent = "觸發失敗";
+                spinner.classList.add('hidden');
+                messageText.classList.remove('hidden');
+            }
+        });
+
+        // 讀取 GitHub Actions 產生的 data.json 靜態檔
+        async function fetchAttendanceData() {
+            try {
+                const res = await fetch(`data.json?t=${new Date().getTime()}`);
+                if (!res.ok) throw new Error("Data file not found");
+                
+                const data = await res.json();
+                if (data.status === "success") {
+                    leftTimeEl.textContent = data.entry_time;
+                    rightTimeEl.textContent = data.exit_time;
+                } else {
+                    leftTimeEl.textContent = data.entry_time || "--:--";
+                    rightTimeEl.textContent = data.exit_time || "--:--";
+                }
+            } catch (err) {
+                console.error("Fetch Data Error:", err);
+                leftTimeEl.textContent = "尚無資料";
+                rightTimeEl.textContent = "--:--";
+            } finally {
+                spinner.classList.add('hidden');
+                messageText.classList.remove('hidden');
+            }
+        }
+
+        manualTimeBtn.addEventListener('click', () => {
+            const now = new Date();
+            manualInput.value = `${now.getFullYear()}-${padZero(now.getMonth()+1)}-${padZero(now.getDate())}T${padZero(now.getHours())}:${padZero(now.getMinutes())}`;
+            manualModal.classList.remove('hidden');
+            manualModal.classList.add('flex');
+        });
+
+        closeManualBtn.addEventListener('click', () => {
+            manualModal.classList.add('hidden');
+            manualModal.classList.remove('flex');
+        });
+
+        applyManualBtn.addEventListener('click', () => {
+            if (manualInput.value) {
+                setPunchTimes(new Date(manualInput.value));
+                manualModal.classList.add('hidden');
+                manualModal.classList.remove('flex');
+            }
+        });
+
+        setInterval(updateCountdown, 1000);
+        updateCountdown();
+        fetchAttendanceData();
+    </script>
+</body>
+</html>
